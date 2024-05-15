@@ -1,4 +1,4 @@
-<!--
+<?xml version="1.0" encoding="UTF-8"?><!--
 Copyright BRAINTRIBE TECHNOLOGY GMBH, Austria, 2002-2022
 
 This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public
@@ -17,8 +17,7 @@ You should have received a copy of the GNU Lesser General Public License along w
     </parent>
     <artifactId>js-setup-processing</artifactId>
     <version>3.0.7</version>
-    <properties>
-    </properties>
+    <properties/>
     <licenses>
         <license>
             <name>GNU Lesser General Public License v3.0</name>
@@ -57,6 +56,11 @@ You should have received a copy of the GNU Lesser General Public License along w
         <dependency>
             <groupId>com.braintribe.devrock</groupId>
             <artifactId>compiled-artifact-model</artifactId>
+            <version>${V.com.braintribe.devrock}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.braintribe.devrock</groupId>
+            <artifactId>dev-env-api</artifactId>
             <version>${V.com.braintribe.devrock}</version>
         </dependency>
     </dependencies>

@@ -44,19 +44,23 @@ import com.braintribe.codec.marshaller.yaml.YamlMarshaller;
 import com.braintribe.common.attribute.common.CallerEnvironment;
 import com.braintribe.console.ConsoleOutputs;
 import com.braintribe.console.output.ConsoleOutput;
+import com.braintribe.devrock.env.api.DevEnvironment;
 import com.braintribe.devrock.mc.api.js.JsLibraryLinker;
 import com.braintribe.devrock.mc.api.js.JsLibraryLinkingContext;
 import com.braintribe.devrock.mc.api.js.JsLibraryLinkingResult;
 import com.braintribe.devrock.mc.core.commons.SymbolicLinker;
 import com.braintribe.devrock.mc.core.wirings.codebase.CodebaseRepositoryModule;
+import com.braintribe.devrock.mc.core.wirings.configuration.contract.DevelopmentEnvironmentContract;
+import com.braintribe.devrock.mc.core.wirings.env.configuration.EnvironmentSensitiveConfigurationWireModule;
 import com.braintribe.devrock.mc.core.wirings.js.JsResolverWireModule;
 import com.braintribe.devrock.mc.core.wirings.js.contract.JsResolverContract;
-import com.braintribe.devrock.mc.core.wirings.maven.configuration.MavenConfigurationWireModule;
+import com.braintribe.devrock.mc.core.wirings.venv.contract.VirtualEnvironmentContract;
 import com.braintribe.model.artifact.analysis.AnalysisArtifact;
 import com.braintribe.model.artifact.analysis.AnalysisArtifactResolution;
 import com.braintribe.model.artifact.analysis.AnalysisDependency;
 import com.braintribe.model.artifact.compiled.CompiledDependency;
 import com.braintribe.model.generic.reflection.EntityType;
+import com.braintribe.model.processing.service.api.ServiceRequestContext;
 import com.braintribe.model.processing.service.impl.AbstractDispatchingServiceProcessor;
 import com.braintribe.model.processing.service.impl.DispatchConfiguration;
 import com.braintribe.model.service.api.result.Neutral;
@@ -68,6 +72,7 @@ import com.braintribe.utils.paths.UniversalPath;
 import com.braintribe.ve.api.VirtualEnvironment;
 import com.braintribe.wire.api.Wire;
 import com.braintribe.wire.api.context.WireContext;
+import com.braintribe.wire.api.context.WireContextBuilder;
 
 import tribefire.extension.js.model.api.request.AssembleJsDeps;
 import tribefire.extension.js.model.api.request.JsSetupRequest;
@@ -89,14 +94,16 @@ public class JsSetupProcessor extends AbstractDispatchingServiceProcessor<JsSetu
 
 	@Override
 	protected void configureDispatching(DispatchConfiguration<JsSetupRequest, Object> dispatching) {
-		dispatching.register(AssembleJsDeps.T, (ctx, req) -> new JsDepsAssembler(req).run());
+		dispatching.register(AssembleJsDeps.T, (ctx, req) -> new JsDepsAssembler(ctx, req).run());
 	}
 
 	private class JsDepsAssembler {
 
 		private final AssembleJsDeps request;
+		private final ServiceRequestContext context;
 
-		public JsDepsAssembler(AssembleJsDeps request) {
+		public JsDepsAssembler(ServiceRequestContext context, AssembleJsDeps request) {
+			this.context = context;
 			this.request = request;
 		}
 
@@ -149,15 +156,23 @@ public class JsSetupProcessor extends AbstractDispatchingServiceProcessor<JsSetu
 
 		// TODO redo once we have AggregatorWireModule
 		private WireContext<JsResolverContract> jsResolverModule(File workspaceDir) {
+			final WireContextBuilder<JsResolverContract> contextBuilder;
 			if (isWorkspace(workspaceDir)) {
 				CodebaseRepositoryModule crm = new CodebaseRepositoryModule( //
 						workspaceDir, "${artifactId}", emptySet(), singleton("model"));
-
-				return Wire.context(JsResolverWireModule.INSTANCE, new MavenConfigurationWireModule(virtualEnvironment), crm);
+				
+				contextBuilder = Wire.contextBuilder(JsResolverWireModule.INSTANCE, EnvironmentSensitiveConfigurationWireModule.INSTANCE, crm);
 
 			} else {
-				return Wire.context(JsResolverWireModule.INSTANCE, new MavenConfigurationWireModule(virtualEnvironment));
+				contextBuilder = Wire.contextBuilder(JsResolverWireModule.INSTANCE, EnvironmentSensitiveConfigurationWireModule.INSTANCE);
 			}
+			
+			File devEnvRoot = context.findAttribute(DevEnvironment.class).map(DevEnvironment::getRootPath).orElse(null);
+			
+			return contextBuilder //
+					.bindContract(DevelopmentEnvironmentContract.class, () -> devEnvRoot) //
+					.bindContract(VirtualEnvironmentContract.class, () -> virtualEnvironment) //
+					.build();
 		}
 
 		private void assembleJsDeps(File projectDir, JsResolverContract contract) {
